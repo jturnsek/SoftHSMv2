@@ -381,8 +381,6 @@ CK_RV SoftHSM::C_Initialize(CK_VOID_PTR pInitArgs)
 {
 	CK_C_INITIALIZE_ARGS_PTR args;
 
-	INFO_MSG("SoftHSM C_Initialize");
-
 	// Check if PKCS#11 is already initialized
 	if (isInitialised)
 	{
@@ -499,6 +497,8 @@ CK_RV SoftHSM::C_Initialize(CK_VOID_PTR pInitArgs)
 		ERROR_MSG("Could not set the log level");
 		return CKR_GENERAL_ERROR;
 	}
+
+	INFO_MSG("SoftHSM C_Initialize");
 
 	// Configure object store storage backend used by all tokens.
 	if (!ObjectStoreToken::selectBackend(Configuration::i()->getString("objectstore.backend", DEFAULT_OBJECTSTORE_BACKEND)))
