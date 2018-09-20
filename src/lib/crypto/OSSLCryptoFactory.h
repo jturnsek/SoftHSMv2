@@ -44,6 +44,10 @@
 #include <openssl/conf.h>
 #include <openssl/engine.h>
 
+#include <tss2/tss2_sys.h>
+#include <tss2/tss2_tcti.h>
+#include <tss2/tss2-tcti-tabrmd.h>
+
 class OSSLCryptoFactory : public CryptoFactory
 {
 public:
@@ -110,6 +114,8 @@ private:
 	// The GOST engine
 	ENGINE *eg;
 #endif
+
+	TSS2_SYS_CONTEXT *context;
 };
 
 #endif // !_SOFTHSM_V2_OSSLCRYPTOFACTORY_H

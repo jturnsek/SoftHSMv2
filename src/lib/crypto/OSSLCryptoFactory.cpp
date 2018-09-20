@@ -70,6 +70,11 @@
 #include <openssl/objects.h>
 #endif
 
+#include <dlfcn.h>
+#include <syslog.h>
+#include <unistd.h>
+#include <sys/types.h>
+
 #ifdef WITH_FIPS
 // Initialise the FIPS 140-2 selftest status
 bool OSSLCryptoFactory::FipsSelfTestStatus = false;
@@ -77,6 +82,105 @@ bool OSSLCryptoFactory::FipsSelfTestStatus = false;
 
 static unsigned nlocks;
 static Mutex** locks;
+
+static void *handle;
+static const TSS2_TCTI_INFO *info;
+static TSS2_TCTI_CONTEXT *tcti = NULL;
+
+#define DISABLE_DLCLOSE
+
+#define TSS2_TCTI_SO_FORMAT "libtss2-tcti-%s.so.0"
+
+void tpm2_tcti_ldr_unload(void) {
+  if (handle) {
+#ifndef DISABLE_DLCLOSE
+    dlclose(handle);
+#endif
+    handle = NULL;
+    info = NULL;
+  }
+}
+
+const TSS2_TCTI_INFO *tpm2_tcti_ldr_getinfo(void) {
+  return info;
+}
+
+static void* tpm2_tcti_ldr_dlopen(const char *name) {
+  char path[PATH_MAX];
+  size_t size = snprintf(path, sizeof(path), TSS2_TCTI_SO_FORMAT, name);
+  if (size >= sizeof(path)) {
+    return NULL;
+  }
+
+  return dlopen(path, RTLD_LAZY);
+}
+
+bool tpm2_tcti_ldr_is_tcti_present(const char *name) {
+  void *handle = tpm2_tcti_ldr_dlopen(name);
+  if (handle) {
+    dlclose(handle);
+  }
+
+  return handle != NULL;
+}
+
+TSS2_TCTI_CONTEXT *tpm2_tcti_ldr_load(const char *path) {
+  TSS2_TCTI_CONTEXT *tcti_ctx = NULL;
+
+  if (handle) {
+
+    return NULL;
+  }
+
+  /*
+  * Try what they gave us, if it doesn't load up, try
+  * libtss2-tcti-xxx.so replacing xxx with what they gave us.
+  */
+  handle = dlopen (path, RTLD_LAZY);
+  if (!handle) {
+
+    handle = tpm2_tcti_ldr_dlopen(path);
+    if (!handle) {
+      ERROR_MSG("Could not dlopen library: \"%s\"", path);
+      return NULL;
+    }
+  }
+
+  TSS2_TCTI_INFO_FUNC infofn = (TSS2_TCTI_INFO_FUNC)dlsym(handle, TSS2_TCTI_INFO_SYMBOL);
+  if (!infofn) {
+    ERROR_MSG("Symbol \"%s\"not found in library: \"%s\"", TSS2_TCTI_INFO_SYMBOL, path);
+    goto err;
+  }
+
+  info = infofn();
+
+  TSS2_TCTI_INIT_FUNC init = info->init;
+
+  size_t size;
+  TSS2_RC rc = init(NULL, &size, NULL);
+  if (rc != TPM2_RC_SUCCESS) {
+    ERROR_MSG("tcti init setup routine failed for library: \"%s\"", path);
+    goto err;
+  }
+
+  tcti_ctx = (TSS2_TCTI_CONTEXT*) calloc(1, size);
+  if (tcti_ctx == NULL) {
+    goto err;
+  }
+
+  rc = init(tcti_ctx, &size, NULL);
+  if (rc != TPM2_RC_SUCCESS) {
+    ERROR_MSG("tcti init allocation routine failed for library: \"%s\"", path);
+    goto err;
+  }
+
+  return tcti_ctx;
+
+err:
+  free(tcti_ctx);
+  dlclose(handle);
+  return NULL;
+}
 
 // Mutex callback
 void lock_callback(int mode, int n, const char* file, int line)
@@ -163,6 +267,34 @@ OSSLCryptoFactory::OSSLCryptoFactory()
 	// Initialise the one-and-only RNG
 	rng = new OSSLRNG();
 
+	size_t size = 0;
+  	TSS2_RC rc;
+
+	tcti = tpm2_tcti_ldr_load("tabrmd");
+  	if (!tcti)
+  	{
+    	ERROR_MSG("OSSLCryptoFactory: TPM2 Failed!"); 
+    	return; 
+  	}
+
+  	size = Tss2_Sys_GetContextSize(0);
+  	context = (TSS2_SYS_CONTEXT*) calloc(1, size);
+	if (context == NULL)
+	{
+		ERROR_MSG("OSSLCryptoFactory: TPM2 Failed 2!");
+		return;
+	}
+
+	TSS2_ABI_VERSION abi_version = TSS2_ABI_VERSION_CURRENT;
+  
+	rc = Tss2_Sys_Initialize(context, size, tcti, &abi_version);
+	if (rc != TSS2_RC_SUCCESS)
+	{
+		ERROR_MSG("OSSLCryptoFactory: TPM2 Failed 3!");
+		free(context);
+		return;
+	}
+
 #ifdef WITH_GOST
 	// Load engines
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
@@ -224,6 +356,24 @@ err:
 // Destructor
 OSSLCryptoFactory::~OSSLCryptoFactory()
 {
+	TSS2_TCTI_CONTEXT *tcti_ctx;
+
+	tcti_ctx = NULL;
+	if (Tss2_Sys_GetTctiContext(context, &tcti_ctx) != TSS2_RC_SUCCESS) {
+		tcti_ctx = NULL;
+	}
+
+	Tss2_Sys_Finalize(context);
+  	free(context);
+
+	if (tcti_ctx) {
+		Tss2_Tcti_Finalize(tcti_ctx);
+		free(tcti_ctx);
+		tcti_ctx = NULL;
+	}
+
+	tpm2_tcti_ldr_unload();
+
 #ifdef WITH_GOST
 	// Finish the GOST engine
 	if (eg != NULL)
