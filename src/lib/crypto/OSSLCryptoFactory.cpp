@@ -267,6 +267,7 @@ OSSLCryptoFactory::OSSLCryptoFactory()
 	// Initialise the one-and-only RNG
 	rng = new OSSLRNG();
 
+#if 0
 	size_t size = 0;
   	TSS2_RC rc;
 
@@ -294,6 +295,7 @@ OSSLCryptoFactory::OSSLCryptoFactory()
 		free(context);
 		return;
 	}
+#endif
 
 #ifdef WITH_GOST
 	// Load engines
@@ -356,6 +358,7 @@ err:
 // Destructor
 OSSLCryptoFactory::~OSSLCryptoFactory()
 {
+#if 0
 	TSS2_TCTI_CONTEXT *tcti_ctx;
 
 	tcti_ctx = NULL;
@@ -373,7 +376,8 @@ OSSLCryptoFactory::~OSSLCryptoFactory()
 	}
 
 	tpm2_tcti_ldr_unload();
-
+#endif
+	
 #ifdef WITH_GOST
 	// Finish the GOST engine
 	if (eg != NULL)
