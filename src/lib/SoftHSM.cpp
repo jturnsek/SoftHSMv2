@@ -388,6 +388,11 @@ CK_RV SoftHSM::C_Initialize(CK_VOID_PTR pInitArgs)
 		return CKR_CRYPTOKI_ALREADY_INITIALIZED;
 	}
 
+	setlogmask (LOG_UPTO (LOG_NOTICE));
+  	openlog ("SoftHSMv2", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
+  	syslog (LOG_NOTICE, "C_Initialize: User %d", getuid());
+  	closelog ();
+
 	// Do we have any arguments?
 	if (pInitArgs != NULL_PTR)
 	{
