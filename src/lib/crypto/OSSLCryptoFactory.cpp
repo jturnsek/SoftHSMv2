@@ -149,7 +149,9 @@ TSS2_TCTI_CONTEXT *tpm2_tcti_ldr_load(const char *path) {
   TSS2_TCTI_INFO_FUNC infofn = (TSS2_TCTI_INFO_FUNC)dlsym(handle, TSS2_TCTI_INFO_SYMBOL);
   if (!infofn) {
     ERROR_MSG("Symbol \"%s\"not found in library: \"%s\"", TSS2_TCTI_INFO_SYMBOL, path);
-    goto err;
+    free(tcti_ctx);
+  	dlclose(handle);
+  	return NULL;
   }
 
   info = infofn();
@@ -160,26 +162,27 @@ TSS2_TCTI_CONTEXT *tpm2_tcti_ldr_load(const char *path) {
   TSS2_RC rc = init(NULL, &size, NULL);
   if (rc != TPM2_RC_SUCCESS) {
     ERROR_MSG("tcti init setup routine failed for library: \"%s\"", path);
-    goto err;
+    free(tcti_ctx);
+  	dlclose(handle);
+  	return NULL;
   }
 
   tcti_ctx = (TSS2_TCTI_CONTEXT*) calloc(1, size);
   if (tcti_ctx == NULL) {
-    goto err;
+    free(tcti_ctx);
+  	dlclose(handle);
+  	return NULL;
   }
 
   rc = init(tcti_ctx, &size, NULL);
   if (rc != TPM2_RC_SUCCESS) {
     ERROR_MSG("tcti init allocation routine failed for library: \"%s\"", path);
-    goto err;
+    free(tcti_ctx);
+  	dlclose(handle);
+  	return NULL;
   }
 
   return tcti_ctx;
-
-err:
-  free(tcti_ctx);
-  dlclose(handle);
-  return NULL;
 }
 
 // Mutex callback
