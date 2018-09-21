@@ -83,11 +83,9 @@ bool OSSLCryptoFactory::FipsSelfTestStatus = false;
 static unsigned nlocks;
 static Mutex** locks;
 
-#define USE_TPM
+//#define USE_TPM
 #ifdef USE_TPM
 static void *handle;
-//static const TSS2_TCTI_INFO *info;
-//static TSS2_TCTI_CONTEXT *tcti = NULL;
 
 #define DISABLE_DLCLOSE
 
@@ -207,6 +205,47 @@ void lock_callback(int mode, int n, const char* file, int line)
 // Constructor
 OSSLCryptoFactory::OSSLCryptoFactory()
 {
+	size_t size;
+  	TSS2_RC rc;
+
+  	rc = Tss2_Tcti_Tabrmd_Init(NULL, &size, NULL);
+  	if (rc != TSS2_RC_SUCCESS)
+	{
+		ERROR_MSG("OSSLCryptoFactory: TPM2 Failed 1!");
+		return;
+	}
+
+	tcti = (TSS2_TCTI_CONTEXT*) calloc(1, size);
+	if (tcti_ctx == NULL) 
+	{
+		ERROR_MSG("OSSLCryptoFactory: TPM2 Failed 2!");
+		return;
+	}	
+	
+	rc = Tss2_Tcti_Tabrmd_Init(tcti, &size, NULL);
+	if (rc != TPM2_RC_SUCCESS) {
+		ERROR_MSG("OSSLCryptoFactory: TPM2 Failed 3!");
+		return;
+	}
+
+	size = Tss2_Sys_GetContextSize(0);
+  	context = (TSS2_SYS_CONTEXT*) calloc(1, size);
+	if (context == NULL)
+	{
+		ERROR_MSG("OSSLCryptoFactory: TPM2 Failed 2!");
+		return;
+	}
+
+	TSS2_ABI_VERSION abi_version = TSS2_ABI_VERSION_CURRENT;
+  
+	rc = Tss2_Sys_Initialize(context, size, tcti, &abi_version);
+	if (rc != TSS2_RC_SUCCESS)
+	{
+		ERROR_MSG("OSSLCryptoFactory: TPM2 Failed 3!");
+		free(context);
+		return;
+	}
+
 #ifdef USE_TPM
 	size_t size = 0;
   	TSS2_RC rc;
@@ -357,6 +396,21 @@ err:
 // Destructor
 OSSLCryptoFactory::~OSSLCryptoFactory()
 {
+	TSS2_TCTI_CONTEXT *tcti_ctx;
+	
+	tcti_ctx = NULL;
+	if (Tss2_Sys_GetTctiContext(context, &tcti_ctx) != TSS2_RC_SUCCESS) {
+		tcti_ctx = NULL;
+	}
+
+	Tss2_Sys_Finalize(context);
+  	free(context);
+
+	if (tcti_ctx) {
+		Tss2_Tcti_Finalize(tcti_ctx);
+		free(tcti_ctx);
+		tcti_ctx = NULL;
+	}
 #ifdef USE_TPM
 	TSS2_TCTI_CONTEXT *tcti_ctx;
 
