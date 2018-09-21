@@ -78,6 +78,11 @@
 
 #include <stdlib.h>
 
+#include <dlfcn.h>
+#include <syslog.h>
+#include <unistd.h>
+#include <sys/types.h>
+
 // Initialise the one-and-only instance
 
 #ifdef HAVE_CXX11
@@ -498,7 +503,7 @@ CK_RV SoftHSM::C_Initialize(CK_VOID_PTR pInitArgs)
 		return CKR_GENERAL_ERROR;
 	}
 
-	INFO_MSG("SoftHSM C_Initialize");
+	INFO_MSG("SoftHSM C_Initialize: uid=%d", getuid());
 
 	// Configure object store storage backend used by all tokens.
 	if (!ObjectStoreToken::selectBackend(Configuration::i()->getString("objectstore.backend", DEFAULT_OBJECTSTORE_BACKEND)))
