@@ -83,6 +83,8 @@ bool OSSLCryptoFactory::FipsSelfTestStatus = false;
 static unsigned nlocks;
 static Mutex** locks;
 
+//#define USE_TPM
+#ifdef USE_TPM
 static void *handle;
 static const TSS2_TCTI_INFO *info;
 static TSS2_TCTI_CONTEXT *tcti = NULL;
@@ -184,6 +186,7 @@ TSS2_TCTI_CONTEXT *tpm2_tcti_ldr_load(const char *path) {
 
   return tcti_ctx;
 }
+#endif
 
 // Mutex callback
 void lock_callback(int mode, int n, const char* file, int line)
@@ -270,7 +273,7 @@ OSSLCryptoFactory::OSSLCryptoFactory()
 	// Initialise the one-and-only RNG
 	rng = new OSSLRNG();
 
-#if 1
+#ifdef USE_TPM
 	size_t size = 0;
   	TSS2_RC rc;
 
@@ -361,7 +364,7 @@ err:
 // Destructor
 OSSLCryptoFactory::~OSSLCryptoFactory()
 {
-#if 1
+#ifdef USE_TPM
 	TSS2_TCTI_CONTEXT *tcti_ctx;
 
 	tcti_ctx = NULL;
