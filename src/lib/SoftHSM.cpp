@@ -546,6 +546,8 @@ CK_RV SoftHSM::C_Initialize(CK_VOID_PTR pInitArgs)
 // PKCS #11 finalisation function
 CK_RV SoftHSM::C_Finalize(CK_VOID_PTR pReserved)
 {
+	INFO_MSG("SoftHSM C_Finalize: uid=%d", getuid());
+
 	if (!isInitialised) return CKR_CRYPTOKI_NOT_INITIALIZED;
 
 	// Must be set to NULL_PTR in this version of PKCS#11
