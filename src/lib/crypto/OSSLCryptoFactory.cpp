@@ -214,6 +214,36 @@ void lock_callback(int mode, int n, const char* file, int line)
 // Constructor
 OSSLCryptoFactory::OSSLCryptoFactory()
 {
+#ifdef USE_TPM
+	size_t size = 0;
+  	TSS2_RC rc;
+
+	tcti = tpm2_tcti_ldr_load("tabrmd");
+  	if (!tcti)
+  	{
+    	ERROR_MSG("OSSLCryptoFactory: TPM2 Failed!"); 
+    	return; 
+  	}
+
+  	size = Tss2_Sys_GetContextSize(0);
+  	context = (TSS2_SYS_CONTEXT*) calloc(1, size);
+	if (context == NULL)
+	{
+		ERROR_MSG("OSSLCryptoFactory: TPM2 Failed 2!");
+		return;
+	}
+
+	TSS2_ABI_VERSION abi_version = TSS2_ABI_VERSION_CURRENT;
+  
+	rc = Tss2_Sys_Initialize(context, size, tcti, &abi_version);
+	if (rc != TSS2_RC_SUCCESS)
+	{
+		ERROR_MSG("OSSLCryptoFactory: TPM2 Failed 3!");
+		free(context);
+		return;
+	}
+#endif
+
 	// Multi-thread support
 	nlocks = CRYPTO_num_locks();
 	locks = new Mutex*[nlocks];
@@ -272,36 +302,6 @@ OSSLCryptoFactory::OSSLCryptoFactory()
 
 	// Initialise the one-and-only RNG
 	rng = new OSSLRNG();
-
-#ifdef USE_TPM
-	size_t size = 0;
-  	TSS2_RC rc;
-
-	tcti = tpm2_tcti_ldr_load("tabrmd");
-  	if (!tcti)
-  	{
-    	ERROR_MSG("OSSLCryptoFactory: TPM2 Failed!"); 
-    	return; 
-  	}
-
-  	size = Tss2_Sys_GetContextSize(0);
-  	context = (TSS2_SYS_CONTEXT*) calloc(1, size);
-	if (context == NULL)
-	{
-		ERROR_MSG("OSSLCryptoFactory: TPM2 Failed 2!");
-		return;
-	}
-
-	TSS2_ABI_VERSION abi_version = TSS2_ABI_VERSION_CURRENT;
-  
-	rc = Tss2_Sys_Initialize(context, size, tcti, &abi_version);
-	if (rc != TSS2_RC_SUCCESS)
-	{
-		ERROR_MSG("OSSLCryptoFactory: TPM2 Failed 3!");
-		free(context);
-		return;
-	}
-#endif
 
 #ifdef WITH_GOST
 	// Load engines
