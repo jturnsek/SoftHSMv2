@@ -54,6 +54,7 @@ AX_CXX_COMPILE_STDCXX_11([noext],[optional])
 
 # Check for libraries (-ldl can be required by OpenSSL too)
 ACX_DLOPEN
+ACX_TSS2
 
 # Check for headers
 AC_CHECK_HEADERS([pthread.h])
