@@ -83,7 +83,7 @@ bool OSSLCryptoFactory::FipsSelfTestStatus = false;
 static unsigned nlocks;
 static Mutex** locks;
 
-//#define USE_TPM
+#define USE_TPM
 #ifdef USE_TPM
 static void *handle;
 static const TSS2_TCTI_INFO *info;
