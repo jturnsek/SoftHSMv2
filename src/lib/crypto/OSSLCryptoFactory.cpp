@@ -216,7 +216,7 @@ OSSLCryptoFactory::OSSLCryptoFactory()
 	}
 
 	tcti = (TSS2_TCTI_CONTEXT*) calloc(1, size);
-	if (tcti_ctx == NULL) 
+	if (tcti == NULL) 
 	{
 		ERROR_MSG("OSSLCryptoFactory: TPM2 Failed 2!");
 		return;
@@ -397,7 +397,7 @@ err:
 OSSLCryptoFactory::~OSSLCryptoFactory()
 {
 	TSS2_TCTI_CONTEXT *tcti_ctx;
-	
+
 	tcti_ctx = NULL;
 	if (Tss2_Sys_GetTctiContext(context, &tcti_ctx) != TSS2_RC_SUCCESS) {
 		tcti_ctx = NULL;
