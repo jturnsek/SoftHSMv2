@@ -85,7 +85,7 @@ static Mutex** locks;
 
 #define USE_TPM
 #ifdef USE_TPM
-//static void *handle;
+static void *handle;
 //static const TSS2_TCTI_INFO *info;
 //static TSS2_TCTI_CONTEXT *tcti = NULL;
 
@@ -94,17 +94,12 @@ static Mutex** locks;
 #define TSS2_TCTI_SO_FORMAT "libtss2-tcti-%s.so.0"
 
 void tpm2_tcti_ldr_unload(void) {
-  if (OSSLCryptoFactory::handle) {
+  if (handle) {
 #ifndef DISABLE_DLCLOSE
-    dlclose(OSSLCryptoFactory::handle);
+    dlclose(handle);
 #endif
-    OSSLCryptoFactory::handle = NULL;
-    OSSLCryptoFactory::info = NULL;
+    handle = NULL;
   }
-}
-
-const TSS2_TCTI_INFO *tpm2_tcti_ldr_getinfo(void) {
-  return OSSLCryptoFactory::info;
 }
 
 static void* tpm2_tcti_ldr_dlopen(const char *name) {
@@ -118,19 +113,20 @@ static void* tpm2_tcti_ldr_dlopen(const char *name) {
 }
 
 bool tpm2_tcti_ldr_is_tcti_present(const char *name) {
-  void *_handle = tpm2_tcti_ldr_dlopen(name);
-  if (_handle) {
-    dlclose(_handle);
+  void *handle = tpm2_tcti_ldr_dlopen(name);
+  if (handle) {
+    dlclose(handle);
   }
 
-  return _handle != NULL;
+  return handle != NULL;
 }
 
 TSS2_TCTI_CONTEXT *tpm2_tcti_ldr_load(const char *path) {
+  const TSS2_TCTI_INFO *info;
   TSS2_TCTI_CONTEXT *tcti_ctx = NULL;
 
-  if (OSSLCryptoFactory::handle) {
-
+  if (handle) 
+  {
     return NULL;
   }
 
@@ -138,11 +134,11 @@ TSS2_TCTI_CONTEXT *tpm2_tcti_ldr_load(const char *path) {
   * Try what they gave us, if it doesn't load up, try
   * libtss2-tcti-xxx.so replacing xxx with what they gave us.
   */
-  OSSLCryptoFactory::handle = dlopen (path, RTLD_LAZY);
-  if (!OSSLCryptoFactory::handle) {
-
-    OSSLCryptoFactory::handle = tpm2_tcti_ldr_dlopen(path);
-    if (!OSSLCryptoFactory::handle) {
+  handle = dlopen (path, RTLD_LAZY);
+  if (!handle)
+  {
+    handle = tpm2_tcti_ldr_dlopen(path);
+    if (!handle) {
       ERROR_MSG("Could not dlopen library: \"%s\"", path);
       return NULL;
     }
@@ -151,28 +147,25 @@ TSS2_TCTI_CONTEXT *tpm2_tcti_ldr_load(const char *path) {
   TSS2_TCTI_INFO_FUNC infofn = (TSS2_TCTI_INFO_FUNC)dlsym(handle, TSS2_TCTI_INFO_SYMBOL);
   if (!infofn) {
     ERROR_MSG("Symbol \"%s\"not found in library: \"%s\"", TSS2_TCTI_INFO_SYMBOL, path);
-    free(tcti_ctx);
-  	dlclose(OSSLCryptoFactory::handle);
+  	dlclose(handle);
   	return NULL;
   }
 
-  OSSLCryptoFactory::info = infofn();
+  info = infofn();
 
-  TSS2_TCTI_INIT_FUNC init = OSSLCryptoFactory::info->init;
+  TSS2_TCTI_INIT_FUNC init = info->init;
 
   size_t size;
   TSS2_RC rc = init(NULL, &size, NULL);
   if (rc != TPM2_RC_SUCCESS) {
     ERROR_MSG("tcti init setup routine failed for library: \"%s\"", path);
-    free(tcti_ctx);
-  	dlclose(OSSLCryptoFactory::handle);
+  	dlclose(handle);
   	return NULL;
   }
 
   tcti_ctx = (TSS2_TCTI_CONTEXT*) calloc(1, size);
   if (tcti_ctx == NULL) {
-    free(tcti_ctx);
-  	dlclose(OSSLCryptoFactory::handle);
+  	dlclose(handle);
   	return NULL;
   }
 
@@ -180,7 +173,7 @@ TSS2_TCTI_CONTEXT *tpm2_tcti_ldr_load(const char *path) {
   if (rc != TPM2_RC_SUCCESS) {
     ERROR_MSG("tcti init allocation routine failed for library: \"%s\"", path);
     free(tcti_ctx);
-  	dlclose(OSSLCryptoFactory::handle);
+  	dlclose(handle);
   	return NULL;
   }
 

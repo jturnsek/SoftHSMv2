@@ -117,8 +117,6 @@ private:
 
 	TSS2_SYS_CONTEXT *context;
 	TSS2_TCTI_CONTEXT *tcti;
-	void *handle;
-	const TSS2_TCTI_INFO *info;
 };
 
 #endif // !_SOFTHSM_V2_OSSLCRYPTOFACTORY_H
